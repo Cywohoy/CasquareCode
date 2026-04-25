@@ -1,4 +1,4 @@
-Copyright (c) 2026, LilexKR Author (Cywohoy) (https://github.com/papertoy1127/LilexKR)
+Copyright (c) 2026, Casquare Code Author (Cywohoy) (https://github.com/papertoy1127/LilexKR)
 
 This Font Software is licensed under the SIL Open Font License, Version 1.1.
 This license is copied below, and is also available with a FAQ at:

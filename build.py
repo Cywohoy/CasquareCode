@@ -12,42 +12,44 @@ from fontTools.pens.transformPen import TransformPen
 from fontTools.pens.recordingPen import DecomposingRecordingPen
 from fontTools.pens.boundsPen import BoundsPen
 from fontTools.ttLib.tables._g_l_y_f import Glyph
+from fontTools.varLib.instancer import instantiateVariableFont
 from fontTools.subset import Subsetter, Options
 from fontTools.ttLib.tables import otTables as ot
 from ttfautohint import ttfautohint
 
-FONT_VERSION="1.002"
+FONT_VERSION="1.000"
 
-LATIN_DIR = "./source/Lilex"
-LATIN_FILENAME = "Lilex-{style}.ttf"
+LATIN_DIR = "./source/CascadiaCode"
+LATIN_FILENAME = "Cascadia{name}-{style}.ttf"
 
-KR_DIR = "./source/IBM_Plex_Sans_KR"
-KR_FILENAME = "IBMPlexSansKR-{style}.ttf"
+KR_DIR = "./source/"
+KR_FILENAME = "NanumSquareNeo-Variable.ttf"
 
 OUTPUT_DIR = "./output"
 OUTPUT_FILENAME = "{filename}-{style}.ttf"
 
 WEIGHT_MAP = {
-    "Thin": "Thin", 
-    "ExtraLight": "ExtraLight", 
-    "Light": "Light",
-    "Regular": "Regular", 
-    "Medium": "Medium", 
-    "SemiBold": "SemiBold", 
-    "Bold": "Bold"
+    "ExtraLight": 150.0, 
+    "Light": 300.0,
+    "SemiLight": 450.0, 
+    "Regular": 570.0, 
+    "SemiBold": 700.0, 
+    "Bold": 800.0
 }
 
-def get_latin_font(weight, is_italic):
+def get_latin_font(weight, is_italic, name):
     path = os.path.join(LATIN_DIR, LATIN_FILENAME.format(
+        name = name,
         style = f"{(weight != 'Regular' or not is_italic) and weight or ''}{is_italic and 'Italic' or ''}"
     ))
     return TTFont(path)
 
-def get_kr_font(weight):
-    path = os.path.join(KR_DIR, KR_FILENAME.format(
-        style = weight
-    ))
-    return TTFont(path)
+def get_kr_font(weight, variable=[]):
+    if not variable: variable.append(TTFont(os.path.join(KR_DIR, KR_FILENAME)))
+    vfont = variable[0]
+    if 'STAT' in vfont: del vfont['STAT']
+    static_font = instantiateVariableFont(vfont, {"wght": WEIGHT_MAP[weight]})
+    return static_font
 
 def clean(font):
     for tag in ["cvt ", "fpgm", "prep", "gasp", "vhea", "vmtx", "VORG", "BASE"]:
@@ -383,7 +385,6 @@ def build_variant(latin_font, kr_font, weight_key, is_italic, is_wide, latin_tar
     
     merged.save(os.path.join(dir_path, out_filename))
     shutil.copyfile(os.path.join(dir_path, out_filename), os.path.join(all_path, out_filename))
-    
 
     for tmp in [temp_latin_unhinted, temp_latin_hinted, temp_kr]:
         if os.path.exists(tmp): os.remove(tmp)
@@ -391,12 +392,14 @@ def build_variant(latin_font, kr_font, weight_key, is_italic, is_wide, latin_tar
 def _worker_build(task):
     weight = task['weight']
     is_italic = task['is_italic']
+    familyname = task['familyname']
+    modifier = task['modifier']
     family_name = task['family_name']
     is_wide = task['is_wide']
     latin_target_width = task['latin_target_width']
     kr_target_width = task['kr_target_width']
 
-    latin_font = get_latin_font(weight, is_italic)
+    latin_font = get_latin_font(weight, is_italic, familyname+modifier)
     kr_font = get_kr_font(weight)
 
     build_variant(
@@ -416,25 +419,25 @@ def merge_all(regular_only=False):
     os.makedirs(OUTPUT_DIR)
 
     tasks = []
-    styles = ((i,j) for i in WEIGHT_MAP.keys() for j in [False, True])
+    styles = ((i,j,k,l) for i in WEIGHT_MAP.keys() for j in [False, True] for k in ['Code', 'Mono'] for l in ['', 'NF', 'PL'])
     
-    for (weight,is_italic) in styles:
+    for (weight,is_italic,familyname,modifier) in styles:
         tasks.append({
-            'weight': weight, 'is_italic': is_italic,
-            'family_name': f'LilexKR Std',
-            'is_wide': False, 'latin_target_width': 600, 'kr_target_width': 1200
+            'weight': weight, 'is_italic': is_italic, 'familyname': familyname, 'modifier': modifier,
+            'family_name': f'Casquare {(familyname + " " + modifier).rstrip()} Std',
+            'is_wide': False, 'latin_target_width': 1200, 'kr_target_width': 2400
         })
         
         tasks.append({
-            'weight': weight, 'is_italic': is_italic,
-            'family_name': f'LilexKR 528',
-            'is_wide': True, 'latin_target_width': 528, 'kr_target_width': 1056
+            'weight': weight, 'is_italic': is_italic, 'familyname': familyname, 'modifier': modifier,
+            'family_name': f'Casquare {(familyname + " " + modifier).rstrip()} 1080',
+            'is_wide': True, 'latin_target_width': 1080, 'kr_target_width': 2160
         })
         
         tasks.append({
-            'weight': weight, 'is_italic': is_italic,
-            'family_name': f'LilexKR 35',
-            'is_wide': True, 'latin_target_width': 600, 'kr_target_width': 1000
+            'weight': weight, 'is_italic': is_italic, 'familyname': familyname, 'modifier': modifier,
+            'family_name': f'Casquare {(familyname + " " + modifier).rstrip()} 35',
+            'is_wide': True, 'latin_target_width': 1200, 'kr_target_width': 2000
         })
 
     with concurrent.futures.ProcessPoolExecutor() as executor:
