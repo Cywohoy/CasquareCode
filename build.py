@@ -17,7 +17,7 @@ from fontTools.subset import Subsetter, Options
 from fontTools.ttLib.tables import otTables as ot
 from ttfautohint import ttfautohint
 
-FONT_VERSION="1.000"
+FONT_VERSION="1.001"
 
 LATIN_DIR = "./source/CascadiaCode"
 LATIN_FILENAME = "Cascadia{name}-{style}.ttf"
@@ -29,12 +29,21 @@ OUTPUT_DIR = "./output"
 OUTPUT_FILENAME = "{filename}-{style}.ttf"
 
 WEIGHT_MAP = {
-    "ExtraLight": 150.0, 
+    "ExtraLight": 180.0, 
     "Light": 300.0,
-    "SemiLight": 450.0, 
-    "Regular": 570.0, 
+    "SemiLight": 500.0, 
+    "Regular": 620.0, 
     "SemiBold": 700.0, 
     "Bold": 800.0
+}
+
+STEM_WIDTH_MAP = {
+    "ExtraLight": 12, 
+    "Light": 36,
+    "SemiLight": 60, 
+    "Regular": 80, 
+    "SemiBold": 100, 
+    "Bold": 200
 }
 
 def get_latin_font(weight, is_italic, name):
@@ -77,7 +86,6 @@ def fix_meta(font, family_name, weight_name, is_italic, is_wide, avg_width):
     is_bold_style = (weight_name == 'Bold')
     is_regular_style = (weight_name == 'Regular')
     
-    # PPT 등지에서 italic이 제대로 처리 안되는데... 
     if is_regular_style or is_bold_style:
         legacy_family = family_name
         if is_regular_style: legacy_subfamily = 'Italic' if is_italic else 'Regular'
@@ -115,7 +123,6 @@ def fix_meta(font, family_name, weight_name, is_italic, is_wide, avg_width):
         font['name'].setName(string, nid, 3, 1, 1033)
         font['name'].setName(string, nid, 1, 0, 0)
 
-    # 뭔가 시스템에서 이탤릭을 이상하게 인식해서 고친 흔적
     fs_sel = 0
     if "Bold" in weight_name: fs_sel |= (1 << 5)
     if is_italic: fs_sel |= (1 << 0)
@@ -200,11 +207,13 @@ def adjust_font(font, target_font, target_width, target_upm, slant_degree, basel
     s_ymin, s_ymax = pen_s.bounds[1], pen_s.bounds[3]
     s_height = s_ymax - s_ymin
 
-    scale_factor = t_height / s_height
+    base_scale = t_height / s_height
     
-    y_scale = scale_factor * 1.05 
+    boost_ratio = 1.1
+    uniform_scale = base_scale * boost_ratio
     
-    shift_y = t_ymin - (s_ymin * y_scale)
+    target_ymin = t_ymin 
+    shift_y = target_ymin - (s_ymin * uniform_scale)
     
     slant_x = math.tan(slant_degree * 3.1416 / 180.0)
 
@@ -229,7 +238,7 @@ def adjust_font(font, target_font, target_width, target_upm, slant_degree, basel
         rec_pen = DecomposingRecordingPen(glyph_set)
         glyph.draw(rec_pen, glyf)
 
-        transform_matrix = (scale_factor, 0, slant_x * y_scale, y_scale, 0, shift_y)
+        transform_matrix = (uniform_scale, 0, slant_x * uniform_scale, uniform_scale, 0, shift_y)
         
         pen_step1 = TTGlyphPen(glyph_set)
         t_pen1 = TransformPen(pen_step1, transform_matrix)
@@ -238,8 +247,8 @@ def adjust_font(font, target_font, target_width, target_upm, slant_degree, basel
         temp_glyph = pen_step1.glyph()
         temp_glyph.recalcBounds(glyf)
 
-        scaled_w = w * scale_factor
-        scaled_lsb = lsb * scale_factor
+        scaled_w = w * uniform_scale
+        scaled_lsb = lsb * uniform_scale
         
         extra_padding = target_width - scaled_w
         target_lsb = int(scaled_lsb + (extra_padding / 2))
@@ -374,6 +383,8 @@ def build_variant(latin_font, kr_font, weight_key, is_italic, is_wide, latin_tar
         out_file=temp_latin_hinted,
         reference_file=temp_latin_reference,
         windows_compatibility=True,
+        symbol=False,
+        fallback_script="none",
     )
 
     merged = Merger().merge([temp_latin_hinted, temp_kr])
@@ -412,7 +423,7 @@ def build_variant(latin_font, kr_font, weight_key, is_italic, is_wide, latin_tar
 
     for tmp in [temp_latin_unhinted, temp_latin_hinted, temp_latin_reference, temp_kr]:
         if os.path.exists(tmp): os.remove(tmp)
-
+        
 
 import traceback
 def _worker_build(task):
@@ -446,7 +457,7 @@ def _worker_build(task):
 
         
 
-def merge_all():
+def merge_all(test_mode = False):
     if os.path.exists(OUTPUT_DIR): shutil.rmtree(OUTPUT_DIR)
     if os.path.exists('./temp'): shutil.rmtree('./temp')
     os.makedirs(OUTPUT_DIR)
@@ -456,24 +467,26 @@ def merge_all():
     styles = ((i,j,k,l) for i in WEIGHT_MAP.keys() for j in [False, True] for k in ['Code', 'Mono'] for l in ['', 'NF', 'PL'])
     
     for (weight,is_italic,familyname,modifier) in styles:
-        # if familyname != 'Code': continue
-        # if modifier != '': continue
+        if test_mode and familyname != 'Code': continue
+        if test_mode and modifier != '': continue
 
         tasks.append({
             'weight': weight, 'is_italic': is_italic, 'familyname': familyname, 'modifier': modifier,
-            'family_name': f'Casquare {(familyname + " " + modifier).rstrip()} Std',
+            'family_name': f'Casquare {(familyname + (test_mode and " Beta " or " ") + modifier).rstrip()} Std',
             'is_wide': False, 'latin_target_width': 1200, 'kr_target_width': 2400
         })
+
+        if test_mode: continue
         
         tasks.append({
             'weight': weight, 'is_italic': is_italic, 'familyname': familyname, 'modifier': modifier,
-            'family_name': f'Casquare {(familyname + " " + modifier).rstrip()} 1080',
+            'family_name': f'Casquare {(familyname + (test_mode and " Beta " or " ") + modifier).rstrip()} 1080',
             'is_wide': False, 'latin_target_width': 1080, 'kr_target_width': 2160
         })
         
         tasks.append({
             'weight': weight, 'is_italic': is_italic, 'familyname': familyname, 'modifier': modifier,
-            'family_name': f'Casquare {(familyname + " " + modifier).rstrip()} 35',
+            'family_name': f'Casquare {(familyname + (test_mode and " Beta " or " ") + modifier).rstrip()} 35',
             'is_wide': True, 'latin_target_width': 1200, 'kr_target_width': 2000
         })
 
@@ -481,5 +494,5 @@ def merge_all():
         executor.map(_worker_build, tasks)
         
 if __name__ == "__main__":
-    merge_all()
+    merge_all(False)
     
