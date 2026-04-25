@@ -1,4 +1,4 @@
-## Casquare Code
+![thumbnail](./image/main.png)
 [Cascadia Code](https://github.com/microsoft/cascadia-code/)를 기반으로 [NanumSquare Neo](https://campaign.naver.com/nanumsquare_neo/)의 한글 글리프를 병합했습니다. 기본적으로 Cascadia Code에 있는 모든 기능을 지원합니다.
 
 ## 구성
@@ -9,6 +9,9 @@
 - Casquare (Code|Mono) (∅|PL|NF) Std: 기본 Cascadia Code와 라틴 글리프의 자폭이 동일하고, 한글 글리프의 자폭이 반각 문자의 두 배인 글꼴입니다.
 - Casquare (Code|Mono) (∅|PL|NF) 1080: 기본 Cascadia Code의 라틴 글리프의 자폭이 90%로 축소된 1080이고, 한글 글리프의 자폭이 반각 문자의 두 배인 글꼴입니다.
 - Casquare (Code|Mono) (∅|PL|NF) 35: 기본 Cascadia Code와 라틴 글리프의 자폭이 동일하고, 한글 글리프의 자폭이 반각 문자의 5/3배인 Wide 버전의 글꼴입니다.
+
+## 갤러리
+![image](./image/image.png)
 
 ## 라이선스
 Casquare Code 시리즈는 SIL Open Font License 1.1에 따라 배포됩니다.
