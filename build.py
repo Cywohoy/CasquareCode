@@ -150,35 +150,54 @@ def fix_meta(font, family_name, weight_name, is_italic, is_wide, avg_width):
     font['OS/2'].ulCodePageRange1 |= (1 << 19)
     font['OS/2'].xAvgCharWidth = avg_width
 
-def condense_font_x(font, scale_x):
+def condense_font_x(font, base_width, target_glyph_width, target_advance_width):
     hmtx = font['hmtx']
     glyf = font['glyf']
     glyph_set = font.getGlyphSet()
+
+    glyph_scale_x = target_glyph_width / base_width
+    advance_scale_x = target_advance_width / base_width
 
     new_glyf_data = {}
     new_hmtx_data = {}
 
     for glyph_name in list(glyf.keys()):
-        width, lsb = hmtx[glyph_name]
-        new_width = int(width * scale_x)
+        w, lsb = hmtx[glyph_name]
+        new_w = int(w * advance_scale_x)
 
         glyph = glyf.get(glyph_name)
         if glyph and getattr(glyph, 'numberOfContours', 0) != 0:
             rec_pen = DecomposingRecordingPen(glyph_set)
             glyph.draw(rec_pen, glyf)
 
-            matrix = (scale_x, 0, 0, 1.0, 0, 0)
-            pen = TTGlyphPen(glyph_set)
-            transform_pen = TransformPen(pen, matrix)
-            rec_pen.replay(transform_pen)
-            
-            new_glyph = pen.glyph()
-            new_glyph.recalcBounds(glyf)
-            
-            new_glyf_data[glyph_name] = new_glyph
-            new_hmtx_data[glyph_name] = (new_width, int(lsb * scale_x))
+            transform_matrix = (glyph_scale_x, 0, 0, 1.0, 0, 0)
+            pen_step1 = TTGlyphPen(glyph_set)
+            t_pen1 = TransformPen(pen_step1, transform_matrix)
+            rec_pen.replay(t_pen1)
+
+            temp_glyph = pen_step1.glyph()
+            temp_glyph.recalcBounds(glyf)
+
+            scaled_w_original = w * glyph_scale_x
+            scaled_lsb = lsb * glyph_scale_x
+
+            extra_padding = new_w - scaled_w_original
+            target_lsb = int(scaled_lsb + (extra_padding / 2))
+
+            shift_x = target_lsb - temp_glyph.xMin
+
+            translate_matrix = (1, 0, 0, 1, shift_x, 0)
+            pen_step2 = TTGlyphPen(glyph_set)
+            t_pen2 = TransformPen(pen_step2, translate_matrix)
+            temp_glyph.draw(t_pen2, glyf)
+
+            final_glyph = pen_step2.glyph()
+            final_glyph.recalcBounds(glyf)
+
+            new_glyf_data[glyph_name] = final_glyph
+            new_hmtx_data[glyph_name] = (new_w, target_lsb)
         else:
-            new_hmtx_data[glyph_name] = (new_width, int(lsb * scale_x))
+            new_hmtx_data[glyph_name] = (new_w, int(lsb * advance_scale_x))
 
     for g_name, g_data in new_glyf_data.items():
         glyf[g_name] = g_data
@@ -365,8 +384,8 @@ def build_variant(latin_font, kr_font, weight_key, is_italic, is_wide, latin_tar
     clean(latin_font)
     clean(kr_font)
     
-    if latin_target_width != latin_basewidth: 
-        condense_font_x(latin_font, latin_target_width / latin_basewidth)
+    if latin_target_width != latin_basewidth:
+        condense_font_x(latin_font, latin_basewidth, latin_basewidth*0.0+latin_target_width*1.0, latin_target_width)
 
     adjust_font(kr_font, latin_font, kr_target_width, latin_upm, is_italic*slant_degree, 'X', '모')
     filter_kr(kr_font)
@@ -448,7 +467,7 @@ def _worker_build(task):
             is_wide=is_wide,
             latin_target_width=latin_target_width,
             kr_target_width=kr_target_width,
-            slant_degree=8.5,
+            slant_degree=8.50,
             family_name=family_name
         )
 
@@ -469,21 +488,21 @@ def merge_all(test_mode = False):
     for (weight,is_italic,familyname,modifier) in styles:
         if test_mode and familyname != 'Code': continue
         if test_mode and modifier != '': continue
-
-        tasks.append({
-            'weight': weight, 'is_italic': is_italic, 'familyname': familyname, 'modifier': modifier,
-            'family_name': f'Casquare {(familyname + (test_mode and " Beta " or " ") + modifier).rstrip()} Std',
-            'is_wide': False, 'latin_target_width': 1200, 'kr_target_width': 2400
-        })
-
-        if test_mode: continue
         
         tasks.append({
             'weight': weight, 'is_italic': is_italic, 'familyname': familyname, 'modifier': modifier,
             'family_name': f'Casquare {(familyname + (test_mode and " Beta " or " ") + modifier).rstrip()} 1080',
             'is_wide': False, 'latin_target_width': 1080, 'kr_target_width': 2160
         })
+
+        if test_mode: continue
         
+        tasks.append({
+            'weight': weight, 'is_italic': is_italic, 'familyname': familyname, 'modifier': modifier,
+            'family_name': f'Casquare {(familyname + (test_mode and " Beta " or " ") + modifier).rstrip()} Std',
+            'is_wide': False, 'latin_target_width': 1200, 'kr_target_width': 2400
+        })
+
         tasks.append({
             'weight': weight, 'is_italic': is_italic, 'familyname': familyname, 'modifier': modifier,
             'family_name': f'Casquare {(familyname + (test_mode and " Beta " or " ") + modifier).rstrip()} 35',
@@ -494,5 +513,6 @@ def merge_all(test_mode = False):
         executor.map(_worker_build, tasks)
         
 if __name__ == "__main__":
-    merge_all(False)
-    
+    merge_all(True)
+
+
