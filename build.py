@@ -14,10 +14,10 @@ from fontTools.pens.recordingPen import DecomposingRecordingPen
 from fontTools.pens.boundsPen import BoundsPen
 from fontTools.varLib.instancer import instantiateVariableFont
 from fontTools.subset import Subsetter, Options
-from fontTools.ttLib.tables import otTables, _g_l_y_f
-from ttfautohint import ttfautohint
+from fontTools.ttLib.tables import otTables
+from fontTools.ttLib.tables._g_a_s_p import table__g_a_s_p
 
-FONT_VERSION="1.002"
+FONT_VERSION="1.003"
 
 LATIN_DIR = "./source/CascadiaCode"
 LATIN_FILENAME = "Cascadia{name}-{style}.ttf"
@@ -43,7 +43,7 @@ STEM_WIDTH_MAP = {
     "SemiLight": 60, 
     "Regular": 80, 
     "SemiBold": 100, 
-    "Bold": 200
+    "Bold": 120
 }
 
 def get_latin_font(weight, is_italic, name):
@@ -376,34 +376,19 @@ def build_variant(latin_font, kr_font, weight_key, is_italic, is_wide, latin_tar
     buffer0 = io.BytesIO()
     buffer1 = io.BytesIO()
 
-    latin_font.save(buffer0)
-
     latin_metrics = copy.deepcopy(latin_font['OS/2'])
     latin_hhea = copy.deepcopy(latin_font['hhea'])
 
     clean(latin_font)
     clean(kr_font)
     
-    adjust_latin(latin_font, latin_basewidth, latin_basewidth*0.6+latin_target_width*0.4, latin_target_width, 0.985)
-    adjust_kr(kr_font, latin_font, kr_target_width, latin_upm, is_italic*slant_degree, 1.05 / 0.985, 'X', '모')
+    new_width = (latin_basewidth * 0.6 + latin_target_width * 0.4)
+
+    adjust_latin(latin_font, latin_basewidth, new_width, latin_target_width, 1.0)
+    adjust_kr(kr_font, latin_font, kr_target_width, latin_upm, is_italic*slant_degree, 1.08 / 1.0, 'X', '모')
     filter_kr(kr_font)
 
-    latin_font.save(buffer1)
-
-    hinted = ttfautohint(
-        in_buffer=buffer1.getvalue(),
-        windows_compatibility=False,
-        symbol=False,
-        increase_x_height=14,
-        gray_stem_width_mode=0,
-        gdi_cleartype_stem_width_mode=0,
-        dw_cleartype_stem_width_mode=0
-    )
-
-    buffer0.seek(0)
-    buffer1.seek(0)
-
-    buffer0.write(hinted)
+    latin_font.save(buffer0)
     kr_font.save(buffer1)
 
     buffer0.seek(0)
@@ -422,6 +407,10 @@ def build_variant(latin_font, kr_font, weight_key, is_italic, is_wide, latin_tar
     merged['hhea'].ascent = latin_hhea.ascent
     merged['hhea'].descent = latin_hhea.descent
     merged['hhea'].lineGap = latin_hhea.lineGap
+    
+    gasp_table = table__g_a_s_p()
+    gasp_table.gaspRange = {0xFFFF: 15}
+    merged['gasp'] = gasp_table
 
     fix_meta(merged, family_name, weight_key, is_italic, is_wide, latin_target_width)
     enablecjk(merged)
@@ -499,7 +488,7 @@ def merge_all(test_mode = False):
             'is_wide': False, 'latin_target_width': 1200, 'kr_target_width': 2400
         })
 
-        if test_mode: continue
+        # if test_mode: continue
 
         tasks.append({
             'weight': weight, 'is_italic': is_italic, 'familyname': familyname, 'modifier': modifier,
