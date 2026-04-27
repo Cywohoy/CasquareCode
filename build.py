@@ -478,9 +478,7 @@ def _worker_build(task):
         )
 
     except Exception:
-        traceback.print_exc()
-
-        
+        traceback.print_exc()  
 
 def merge_all(test_mode = False):
     if os.path.exists(OUTPUT_DIR): shutil.rmtree(OUTPUT_DIR)
