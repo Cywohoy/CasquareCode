@@ -10,7 +10,7 @@
 - Casquare (Code|Mono) (∅|PL|NF) 1080: 기본 Cascadia Code의 라틴 글리프의 자폭이 90%로 축소된 1080이고, 한글 글리프의 자폭이 반각 문자의 두 배인 글꼴입니다.
 - Casquare (Code|Mono) (∅|PL|NF) 35: 기본 Cascadia Code와 라틴 글리프의 자폭이 동일하고, 한글 글리프의 자폭이 반각 문자의 5/3배인 Wide 버전의 글꼴입니다.
 
-본래 힌팅을 위해 ttfautohint를 사용하였으나, 합자 등의 부분에서 오토힌팅이 문제를 일으키고 한글과 조화롭게 보이지 않아 배제했습니다. Lilex/IBM Plex Sans KR의 힌팅을 직접 적용할 수 있는 방법이 존재하거나 수동 힌팅을 하지 않는 한 힌팅을 다시 복구할 계획은 없습니다. 이는 [Reflex KR](https://github.com/Cywohoy/ReflexKR)도 마찬가지입니다.
+본래 힌팅을 위해 ttfautohint를 사용하였으나, 합자 등의 부분에서 오토힌팅이 문제를 일으키고 한글과 조화롭게 보이지 않아 배제했습니다. Cascadia Code/나눔스퀘어 네오의 힌팅을 직접 적용할 수 있는 방법이 존재하거나 수동 힌팅을 하지 않는 한 힌팅을 다시 복구할 계획은 없습니다. 이는 [Reflex KR](https://github.com/Cywohoy/ReflexKR)도 마찬가지입니다.
 
 ## 갤러리
 ![image](./image/image.png)
